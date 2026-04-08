@@ -1,0 +1,15 @@
+/* GipetauPodcast — Block Editor Styles */
+.editor-styles-wrapper{
+  background:var(--gp-base,#090909);
+  color:var(--gp-text,#f2ede4);
+  font-family:var(--gp-font-body,'Cormorant Garamond',Georgia,serif);
+  font-size:var(--gp-fs-body,1rem);
+  line-height:var(--gp-lh-body,1.6);
+}
+.editor-styles-wrapper h1,.editor-styles-wrapper h2,.editor-styles-wrapper h3,.editor-styles-wrapper h4{
+  font-family:var(--gp-font-heading,'Cormorant Garamond',Georgia,serif);
+  font-style:var(--gp-h-style,italic);
+  font-weight:var(--gp-h-weight,600);
+  line-height:var(--gp-lh-heading,1.2);
+}
+.editor-styles-wrapper a{color:var(--gp-accent,#c0352a)}
