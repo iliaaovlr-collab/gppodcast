@@ -259,9 +259,9 @@ var gppAllEpisodes = <?php echo json_encode($all_data, JSON_UNESCAPED_UNICODE); 
     scrollToActive();
     // 1. Auto-navigate to playing track's season (unless user picked one)
     if(sessionStorage.getItem('gpp_user_season')){sessionStorage.removeItem('gpp_user_season');return;}
-    if(audio.src&&!document.querySelector('.gpp-ep-active')&&window.gppAllEpisodes&&typeof navigateTo==='function'){
+    if(audio.src&&!document.querySelector('.gpp-ep-active')&&window.gppAllEpisodes){
       var ep=gppAllEpisodes.find(function(e){return audio.src.indexOf(e.src)!==-1;});
-      if(ep&&ep.season_url) navigateTo(ep.season_url);
+      if(ep&&ep.season_url) location.href=ep.season_url;
     }
   },400);
 })();
