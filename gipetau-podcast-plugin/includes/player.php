@@ -369,76 +369,7 @@ function gpp_render_player() {
     updateTitleLink();
   };
 
-  // ═══ AJAX NAVIGATION ═══
-  function isInternal(url) { try { var u = new URL(url, location.origin); return u.origin === location.origin && !u.pathname.match(/wp-admin|wp-login/); } catch(e) { return false; } }
-
-  document.addEventListener('click', function(e) {
-    // Skip timecodes — handled above
-    if (e.target.closest('.gpp-tc-time[data-time]')) return;
-    var a = e.target.closest('a[href]');
-    if (!a || e.ctrlKey || e.metaKey || e.shiftKey || a.target === '_blank') return;
-    var href = a.getAttribute('href');
-    if (!href || href === '#' || href.startsWith('#') || href.startsWith('javascript:')) return;
-    if (!isInternal(href)) return;
-    e.preventDefault();
-    navigateTo(href);
-  });
-
-  window.addEventListener('popstate', function() { navigateTo(location.href, true); });
-
-  window.navigateTo = navigateTo;
-  function navigateTo(url, noPush) {
-    document.body.style.cursor = 'wait';
-    fetch(url).then(function(r) { return r.text(); }).then(function(html) {
-      var doc = (new DOMParser()).parseFromString(html, 'text/html');
-      var nc = doc.querySelector('.gp-center'), oc = document.querySelector('.gp-center');
-      if (nc && oc) oc.innerHTML = nc.innerHTML;
-      else { var nm = doc.querySelector('.site-content'), om = document.querySelector('.site-content'); if (nm && om) om.innerHTML = nm.innerHTML; }
-      var nr = doc.querySelector('.gp-panel--right .gp-panel-inner'), or_ = document.querySelector('.gp-panel--right .gp-panel-inner');
-      if (nr && or_) or_.innerHTML = nr.innerHTML;
-      document.title = doc.title;
-      document.querySelectorAll('.gp-nav .current-menu-item').forEach(function(el) { el.classList.remove('current-menu-item'); });
-      doc.querySelectorAll('.gp-nav .current-menu-item').forEach(function(el) { var lk = el.querySelector('a'); if (lk) { var m = document.querySelector('.gp-nav a[href="' + lk.getAttribute('href') + '"]'); if (m) m.parentElement.classList.add('current-menu-item'); } });
-
-      // Load new episode into player only if player is idle
-      var epArticle = doc.querySelector('[data-episode-audio]');
-      if (epArticle && epArticle.dataset.episodeAudio) {
-        var newSrc = epArticle.dataset.episodeAudio;
-        if (audio.paused && !audio.currentTime) {
-          gpLoadEpisode(newSrc,
-            epArticle.dataset.episodeTitle || '',
-            epArticle.dataset.episodeSe || '',
-            epArticle.dataset.episodeCover || '',
-            parseInt(epArticle.dataset.episodeDuration) || 0
-          );
-        }
-      }
-
-      // Execute inline scripts in new content
-      document.querySelectorAll('.gp-center script').forEach(function(s) { var ns = document.createElement('script'); ns.textContent = s.textContent; s.parentNode.replaceChild(ns, s); });
-
-      // 1. Force lazy images to load after AJAX replacement
-      document.querySelectorAll('.gp-center img[loading="lazy"], .gp-panel--right img[loading="lazy"]').forEach(function(img) {
-        img.removeAttribute('loading');
-        img.removeAttribute('decoding');
-        // Re-trigger by cloning src
-        var src = img.getAttribute('src');
-        if (src) { img.removeAttribute('src'); img.setAttribute('src', src); }
-      });
-      // Also fix srcset images
-      document.querySelectorAll('.gp-center img[srcset], .gp-panel--right img[srcset]').forEach(function(img) {
-        var ss = img.getAttribute('srcset');
-        img.removeAttribute('srcset'); img.setAttribute('srcset', ss);
-      });
-
-      var c = document.querySelector('.gp-center'); if (c) c.scrollTop = 0;
-      if (!noPush) history.pushState(null, '', url);
-      document.body.style.cursor = '';
-      updateTitleLink();
-    }).catch(function() { document.body.style.cursor = ''; location.href = url; });
-  }
-
-  // 2. Disable player link when on current episode page
+  // Disable player link when on current episode page
   function updateTitleLink() {
     var link = document.getElementById('bpTitleLink');
     if (!link) return;
