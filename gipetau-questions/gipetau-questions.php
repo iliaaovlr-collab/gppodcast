@@ -14,18 +14,9 @@ function gppq_send_mail($to, $subject, $body) {
     $from_name  = 'Гипетау Подкаст';
     $from_email = 'no-reply@' . preg_replace('/^www\./', '', parse_url(home_url(), PHP_URL_HOST));
 
-    $set_from      = function () use ($from_email) { return $from_email; };
-    $set_from_name = function () use ($from_name)  { return $from_name; };
+    $headers = ['From: ' . $from_name . ' <' . $from_email . '>'];
 
-    add_filter('wp_mail_from',      $set_from);
-    add_filter('wp_mail_from_name', $set_from_name);
-
-    $sent = wp_mail($to, $subject, $body);
-
-    remove_filter('wp_mail_from',      $set_from);
-    remove_filter('wp_mail_from_name', $set_from_name);
-
-    return $sent;
+    return wp_mail($to, $subject, $body, $headers);
 }
 
 /* ═══════════════════════════════════════════
