@@ -75,10 +75,10 @@ add_action('manage_gpp_poll_posts_custom_column', function ($column, $post_id) {
         $tg = get_post_meta($post_id, '_gpp_poll_tg_votes', true);
         $site_total = is_array($v) ? array_sum($v) : 0;
         $tg_total   = is_array($tg) ? array_sum($tg) : 0;
-        if ($tg_total > 0) {
+        if ($site_total > 0 && $tg_total > 0) {
             echo $site_total . ' + ' . $tg_total . ' ТГ';
         } else {
-            echo $site_total;
+            echo $site_total + $tg_total;
         }
     }
 }, 10, 2);
@@ -397,9 +397,9 @@ function gpp_poll_display($post_id = null) {
         if ($ended) {
             echo '<span>Голосование завершено</span>';
             if ($total > 0) {
-                if ($tg_total > 0) {
+                if ($site_total > 0 && $tg_total > 0) {
                     echo '<span class="gpp-poll-ft-sep">&middot;</span>';
-                    echo '<span>' . $site_total . ' сайт + ' . $tg_total . ' ТГ = ' . $total . '</span>';
+                    echo '<span>' . $site_total . '&nbsp;сайт + ' . $tg_total . '&nbsp;ТГ = ' . $total . '</span>';
                 } else {
                     echo '<span class="gpp-poll-ft-sep">&middot;</span>';
                     echo '<span>' . $total . ' ' . gpp_poll_word($total) . '</span>';
