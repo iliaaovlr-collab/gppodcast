@@ -39,19 +39,35 @@ $ep_cover = gpp_episode_cover(get_the_ID());
       </header>
     <?php endif; ?>
 
-    <!-- Circular play button with progress ring -->
     <?php if ($ep_audio): ?>
-    <div class="gpp-play-circle" id="gppPlayCircle" onclick="gpPlayThis(this)">
-      <svg class="gpp-circle-svg" viewBox="0 0 48 48">
-        <circle class="gpp-circle-bg" cx="24" cy="24" r="21"/>
-        <circle class="gpp-circle-buffer" id="gppCircleBuffer" cx="24" cy="24" r="21"/>
-        <circle class="gpp-circle-progress" id="gppCircleProgress" cx="24" cy="24" r="21"/>
-      </svg>
-      <span class="gpp-circle-icon" id="gppCircleIcon">
-        <svg class="gpp-ci-play" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,3 20,12 6,21"/></svg>
-        <svg class="gpp-ci-pause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="5" y="3" width="4" height="18"/><rect x="15" y="3" width="4" height="18"/></svg>
-      </span>
-      <span class="gpp-circle-loader" id="gppCircleLoader" style="display:none"></span>
+    <div class="gpp-player" id="bottomPlayer">
+      <div class="gpp-player-row">
+        <button class="bp-btn bp-sm" onclick="gpSeek(-15)" title="−15 сек">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        </button>
+        <button class="bp-btn bp-play" id="playBtn" onclick="gpToggle()">
+          <svg id="iconPlay" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+          <svg id="iconPause" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="5" y="3" width="4" height="18"/><rect x="15" y="3" width="4" height="18"/></svg>
+        </button>
+        <button class="bp-btn bp-sm" onclick="gpSeek(15)" title="+15 сек">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10"/></svg>
+        </button>
+        <span class="gpp-player-time" id="mkCur">0:00</span>
+        <div class="bp-prog" id="bpProgress">
+          <div class="bp-prog-fill" id="pFill"></div>
+          <div class="bp-prog-thumb" id="pThumb"></div>
+          <div class="bp-marker bp-marker-hover" id="mkHover">0:00</div>
+        </div>
+        <span class="gpp-player-time" id="mkEnd"><?php echo esc_html(gpp_format_duration($ep_dur)); ?></span>
+        <button class="bp-speed" id="speedBtn" onclick="gpSpeed()">1x</button>
+        <div class="bp-vol" id="bpVol">
+          <button class="bp-vol-btn" onclick="gpMute()">
+            <svg id="iconVolOn" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+            <svg id="iconVolOff" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+          </button>
+          <div class="bp-vol-popup"><input class="bp-vol-range" type="range" min="0" max="100" value="80" id="volRange" oninput="gpVol(this.value)"></div>
+        </div>
+      </div>
     </div>
     <?php endif; ?>
 
