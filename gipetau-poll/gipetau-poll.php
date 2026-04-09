@@ -409,14 +409,16 @@ function gpp_polls_shortcode($atts = []) {
     if (!$polls) return '<p style="text-align:center;color:var(--gp-textmuted)">Опросов пока нет.</p>';
 
     ob_start();
+    echo '<div class="gpp-polls-list">';
     foreach ($polls as $poll) {
-        gpp_poll_render_card($poll);
+        gpp_poll_render_row($poll);
     }
+    echo '</div>';
     return ob_get_clean();
 }
 
 /* ═══════════════════════════════════════════
-   11. ОБЩИЙ РЕНДЕР КАРТОЧКИ ОПРОСА
+   11. РЕНДЕР: КАРТОЧКА (для эпизода / архива)
    ═══════════════════════════════════════════ */
 
 function gpp_poll_render_card($poll) {
@@ -441,21 +443,8 @@ function gpp_poll_render_card($poll) {
     $total      = $site_total + $tg_total;
     $max_votes  = $total > 0 ? max($combined) : 0;
 
-    // Эпизод (для страницы всех опросов)
-    $ep_uid  = get_post_meta($poll->ID, '_gpp_poll_episode_uid', true);
-    $ep_id   = $ep_uid ? gpp_poll_find_episode_by_uid($ep_uid) : null;
-    $ep_link = $ep_id ? get_permalink($ep_id) : '';
-    $ep_name = $ep_id ? get_the_title($ep_id) : '';
-
     echo '<div class="gpp-poll" data-poll-id="' . $poll->ID . '">';
-
     echo '<h3 class="gpp-poll-q">' . esc_html($poll->post_title) . '</h3>';
-
-    // Ссылка на эпизод (только вне страницы эпизода)
-    if ($ep_link && !is_singular('podcast_episode')) {
-        echo '<div class="gpp-poll-ep"><a href="' . esc_url($ep_link) . '">' . esc_html($ep_name) . '</a></div>';
-    }
-
     echo '<div class="gpp-poll-opts">';
     foreach ($options as $i => $opt) {
         $count     = $combined[$i];
@@ -511,6 +500,74 @@ function gpp_poll_render_card($poll) {
 }
 
 /* ═══════════════════════════════════════════
+   11b. РЕНДЕР: КОМПАКТНАЯ СТРОКА (для [gpp_polls])
+   ═══════════════════════════════════════════ */
+
+function gpp_poll_render_row($poll) {
+    $options = get_post_meta($poll->ID, '_gpp_poll_options', true);
+    if (!is_array($options) || empty($options)) return;
+
+    $end_date  = get_post_meta($poll->ID, '_gpp_poll_end_date', true);
+    $ended     = $end_date && strtotime($end_date . ' 23:59:59') < time();
+    $user_vote = gpp_poll_get_user_vote($poll->ID);
+
+    $votes     = get_post_meta($poll->ID, '_gpp_poll_votes', true);
+    if (!is_array($votes)) $votes = [];
+    $tg_votes  = get_post_meta($poll->ID, '_gpp_poll_tg_votes', true);
+    if (!is_array($tg_votes)) $tg_votes = [];
+
+    $combined = [];
+    foreach ($options as $i => $opt) {
+        $combined[$i] = ($votes[$i] ?? 0) + ($tg_votes[$i] ?? 0);
+    }
+    $total     = array_sum($combined);
+    $max_votes = $total > 0 ? max($combined) : 0;
+
+    echo '<div class="gpp-pr" data-poll-id="' . $poll->ID . '">';
+
+    // Вопрос
+    echo '<span class="gpp-pr-q">' . esc_html($poll->post_title) . '</span>';
+
+    // Варианты
+    echo '<span class="gpp-pr-opts">';
+    foreach ($options as $i => $opt) {
+        $count     = $combined[$i];
+        $pct       = $total > 0 ? round($count / $total * 100) : 0;
+        $is_winner = $total > 0 && $count === $max_votes;
+        $is_user   = ($user_vote !== false && $user_vote === $i);
+
+        if ($ended) {
+            $cls = 'gpp-pr-o gpp-pr-o--res';
+            if ($is_winner) $cls .= ' gpp-pr-o--win';
+            if ($is_user)   $cls .= ' gpp-pr-o--my';
+            echo '<span class="' . $cls . '">';
+            echo esc_html($opt) . '&nbsp;<b>' . $pct . '%</b>';
+            echo '</span>';
+        } elseif ($user_vote !== false) {
+            $cls = 'gpp-pr-o gpp-pr-o--done';
+            if ($is_user) $cls .= ' gpp-pr-o--sel';
+            echo '<span class="' . $cls . '">' . esc_html($opt);
+            if ($is_user) echo ' ✓';
+            echo '</span>';
+        } else {
+            echo '<button class="gpp-pr-o" data-option="' . $i . '">' . esc_html($opt) . '</button>';
+        }
+    }
+    echo '</span>';
+
+    // Статус
+    if ($ended) {
+        echo '<span class="gpp-pr-st gpp-pr-st--ended">завершён</span>';
+    } elseif ($user_vote !== false) {
+        echo '<span class="gpp-pr-st">голос принят</span>';
+    } elseif ($end_date) {
+        echo '<span class="gpp-pr-st">до ' . gpp_poll_ru_date($end_date) . '</span>';
+    }
+
+    echo '</div>';
+}
+
+/* ═══════════════════════════════════════════
    12. CSS — флаг для вывода
    ═══════════════════════════════════════════ */
 
@@ -546,15 +603,6 @@ function gpp_poll_css() {
       font-size:var(--gp-fs-h3);font-style:var(--gp-h-style);font-weight:var(--gp-h-weight);
       color:var(--gp-text);margin:0 0 20px;line-height:var(--gp-lh-heading);
     }
-
-    /* Ссылка на эпизод */
-    .gpp-poll-ep{
-      margin:-12px 0 16px;
-      font-family:var(--gp-font-ui);font-size:var(--gp-fs-xs);
-      color:var(--gp-textmuted);text-transform:uppercase;letter-spacing:.05em;
-    }
-    .gpp-poll-ep a{color:var(--gp-accent);text-decoration:none}
-    .gpp-poll-ep a:hover{text-decoration:underline}
 
     /* Контейнер вариантов */
     .gpp-poll-opts{
@@ -624,11 +672,62 @@ function gpp_poll_css() {
     }
     .gpp-poll-ft-sep{margin:0 8px;opacity:.4}
 
-    /* Мобилка */
+    /* Мобилка (карточка) */
     @media(max-width:768px){
       .gpp-poll{padding:18px 16px}
       .gpp-poll-opts{gap:8px}
       .gpp-po{padding:8px 16px;font-size:13px}
+    }
+
+    /* ═══ Компактный список опросов [gpp_polls] ═══ */
+    .gpp-polls-list{
+      display:flex;flex-direction:column;gap:0;
+    }
+    .gpp-pr{
+      display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+      padding:12px 0;
+      border-bottom:1px solid var(--gp-border);
+    }
+    .gpp-pr:first-child{border-top:1px solid var(--gp-border)}
+
+    .gpp-pr-q{
+      font-family:var(--gp-font-body);font-size:var(--gp-fs-body);
+      color:var(--gp-text);font-weight:500;
+      margin-right:auto;
+    }
+
+    .gpp-pr-opts{
+      display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center;
+      flex-shrink:0;
+    }
+
+    .gpp-pr-o{
+      padding:4px 14px;border:1px solid var(--gp-border2);border-radius:16px;
+      font-family:var(--gp-font-ui);font-size:var(--gp-fs-xs);
+      color:var(--gp-text2);background:transparent;
+      cursor:pointer;transition:all .15s;white-space:nowrap;
+    }
+    button.gpp-pr-o:hover{
+      border-color:var(--gp-accent);color:var(--gp-accent);background:var(--gp-accentbg);
+    }
+    button.gpp-pr-o:disabled{opacity:.5;pointer-events:none}
+    .gpp-pr-o b{font-weight:700}
+    .gpp-pr-o--win{border-color:var(--gp-accent);color:var(--gp-accent)}
+    .gpp-pr-o--my{box-shadow:0 0 0 2px var(--gp-accent)}
+    .gpp-pr-o--sel{border-color:var(--gp-accent);color:var(--gp-accent)}
+    .gpp-pr-o--res,.gpp-pr-o--done{cursor:default}
+
+    .gpp-pr-st{
+      font-family:var(--gp-font-ui);font-size:var(--gp-fs-xs);
+      color:var(--gp-textmuted);text-transform:uppercase;letter-spacing:.05em;
+      white-space:nowrap;flex-shrink:0;
+    }
+    .gpp-pr-st--ended{opacity:.5}
+
+    @media(max-width:768px){
+      .gpp-pr{gap:6px}
+      .gpp-pr-q{width:100%;margin-right:0}
+      .gpp-pr-o{padding:4px 10px;font-size:12px}
     }
     </style>
     <?php
@@ -682,6 +781,49 @@ function gpp_poll_js() {
         });
       });
     })();
+
+    // Компактный список [gpp_polls]
+    document.querySelectorAll('.gpp-pr').forEach(function(row){
+      row.addEventListener('click', function(e){
+        var btn = e.target.closest('button.gpp-pr-o');
+        if (!btn) return;
+        btn.disabled = true;
+
+        var fd = new FormData();
+        fd.append('action', 'gpp_poll_vote');
+        fd.append('poll_id', row.dataset.pollId);
+        fd.append('option', btn.dataset.option);
+
+        fetch('<?php echo admin_url("admin-ajax.php"); ?>', {method:'POST', body:fd})
+          .then(function(r){ return r.json(); })
+          .then(function(resp){
+            if (resp.success) {
+              row.querySelectorAll('button.gpp-pr-o').forEach(function(b){
+                var s = document.createElement('span');
+                s.className = 'gpp-pr-o gpp-pr-o--done';
+                if (b.dataset.option === String(resp.data.voted)) {
+                  s.classList.add('gpp-pr-o--sel');
+                  s.innerHTML = b.textContent + ' ✓';
+                } else {
+                  s.textContent = b.textContent;
+                }
+                b.replaceWith(s);
+              });
+              var st = row.querySelector('.gpp-pr-st');
+              if (!st) {
+                st = document.createElement('span');
+                st.className = 'gpp-pr-st';
+                row.appendChild(st);
+              }
+              st.textContent = 'голос принят';
+            } else {
+              alert(resp.data || 'Ошибка');
+              btn.disabled = false;
+            }
+          })
+          .catch(function(){ alert('Ошибка сети'); btn.disabled = false; });
+      });
+    });
     </script>
     <?php
 }
