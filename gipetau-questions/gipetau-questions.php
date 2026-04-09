@@ -7,6 +7,28 @@
 defined('ABSPATH') || exit;
 
 /* ═══════════════════════════════════════════
+   0. ОТПРАВКА ПИСЕМ ОТ ИМЕНИ САЙТА
+   ═══════════════════════════════════════════ */
+
+function gppq_send_mail($to, $subject, $body) {
+    $from_name  = 'Гипетау Подкаст';
+    $from_email = 'no-reply@' . preg_replace('/^www\./', '', parse_url(home_url(), PHP_URL_HOST));
+
+    $set_from      = function () use ($from_email) { return $from_email; };
+    $set_from_name = function () use ($from_name)  { return $from_name; };
+
+    add_filter('wp_mail_from',      $set_from);
+    add_filter('wp_mail_from_name', $set_from_name);
+
+    $sent = wp_mail($to, $subject, $body);
+
+    remove_filter('wp_mail_from',      $set_from);
+    remove_filter('wp_mail_from_name', $set_from_name);
+
+    return $sent;
+}
+
+/* ═══════════════════════════════════════════
    1. ТИП ЗАПИСИ «ВОПРОС»
    ═══════════════════════════════════════════ */
 
@@ -174,7 +196,7 @@ function gppq_send_code() {
     $subject = 'Код подтверждения — Гипетау Подкаст';
     $body    = "Ваш код подтверждения: $code\n\nКод действителен 10 минут.\nЕсли вы не отправляли вопрос — просто проигнорируйте это письмо.";
 
-    $sent = wp_mail($email, $subject, $body);
+    $sent = gppq_send_mail($email, $subject, $body);
     if (!$sent) {
         wp_send_json_error('Не удалось отправить письмо. Попробуйте позже');
     }
@@ -235,7 +257,7 @@ function gppq_verify() {
           . "Категория: {$data['cat']}\n\n"
           . "Сообщение:\n{$data['message']}\n\n"
           . "Посмотреть: " . admin_url('post.php?post=' . $post_id . '&action=edit');
-    wp_mail($admin_email, $subj, $body);
+    gppq_send_mail($admin_email, $subj, $body);
 
     wp_send_json_success();
 }
