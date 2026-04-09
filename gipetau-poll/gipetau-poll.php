@@ -365,6 +365,42 @@ function gpp_poll_ru_date($date) {
     return $d . '&nbsp;' . $m;
 }
 
+// Умная дата: «5 минут назад», «3 дня назад», «01.04.2026»
+function gpp_poll_smart_date($timestamp) {
+    $now  = current_time('timestamp');
+    $diff = $now - $timestamp;
+
+    if ($diff < 60) return 'только что';
+
+    if ($diff < 3600) {
+        $m = floor($diff / 60);
+        $w = gpp_poll_decline($m, 'минуту', 'минуты', 'минут');
+        return $m . ' ' . $w . ' назад';
+    }
+
+    if ($diff < 86400) {
+        $h = floor($diff / 3600);
+        $w = gpp_poll_decline($h, 'час', 'часа', 'часов');
+        return $h . ' ' . $w . ' назад';
+    }
+
+    if ($diff < 14 * 86400) {
+        $d = floor($diff / 86400);
+        $w = gpp_poll_decline($d, 'день', 'дня', 'дней');
+        return $d . ' ' . $w . ' назад';
+    }
+
+    return date('d.m.Y', $timestamp);
+}
+
+function gpp_poll_decline($n, $one, $few, $many) {
+    $m = $n % 10;
+    $m100 = $n % 100;
+    if ($m === 1 && $m100 !== 11) return $one;
+    if ($m >= 2 && $m <= 4 && ($m100 < 10 || $m100 >= 20)) return $few;
+    return $many;
+}
+
 /* ═══════════════════════════════════════════
    9. АКТУАЛЬНЫЙ ОПРОС НА СТРАНИЦЕ АРХИВА
    ═══════════════════════════════════════════ */
@@ -546,6 +582,10 @@ function gpp_poll_render_row($poll) {
 
     echo '<div class="gpp-pr' . ($ended ? ' gpp-pr--ended' : '') . '" data-poll-id="' . $poll->ID . '">';
 
+    // Дата
+    $post_time = get_post_time('U', false, $poll->ID);
+    echo '<span class="gpp-pr-date">' . esc_html(gpp_poll_smart_date($post_time)) . '</span>';
+
     // Вопрос
     echo '<span class="gpp-pr-q">' . esc_html($poll->post_title) . '</span>';
 
@@ -719,6 +759,12 @@ function gpp_poll_css() {
       border-top:1px solid var(--gp-border);
     }
     .gpp-pr--ended{opacity:.7}
+
+    .gpp-pr-date{
+      font-family:var(--gp-font-ui);font-size:var(--gp-fs-xs);
+      color:var(--gp-textmuted);white-space:nowrap;flex-shrink:0;
+      min-width:90px;
+    }
 
     .gpp-pr-q{
       font-family:var(--gp-font-body);font-size:var(--gp-fs-body);
