@@ -259,12 +259,25 @@ function gpp_poll_voter_hash() {
     return md5($ip . '|' . $ua);
 }
 
+function gpp_poll_ip_hash() {
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    return md5('ip|' . $ip);
+}
+
 function gpp_poll_get_user_vote($poll_id) {
+    // 1. Cookie — быстрая проверка
     if (isset($_COOKIE['gpp_voted_' . $poll_id])) {
         return intval($_COOKIE['gpp_voted_' . $poll_id]);
     }
+    // 2. IP+UA — точная проверка
     $hash = gpp_poll_voter_hash();
     $vote = get_post_meta($poll_id, '_gpp_voter_' . $hash, true);
+    if ($vote !== '' && $vote !== false) {
+        return intval($vote);
+    }
+    // 3. Только IP — от смены браузера
+    $ip_hash = gpp_poll_ip_hash();
+    $vote = get_post_meta($poll_id, '_gpp_voter_' . $ip_hash, true);
     if ($vote !== '' && $vote !== false) {
         return intval($vote);
     }
@@ -293,9 +306,11 @@ function gpp_poll_vote_ajax() {
     $options = get_post_meta($poll_id, '_gpp_poll_options', true);
     if (!is_array($options) || !isset($options[$option])) wp_send_json_error('Неверный вариант');
 
-    // Сохраняем голос
+    // Сохраняем голос — по IP+UA и по чистому IP
     $hash = gpp_poll_voter_hash();
     update_post_meta($poll_id, '_gpp_voter_' . $hash, $option);
+    $ip_hash = gpp_poll_ip_hash();
+    update_post_meta($poll_id, '_gpp_voter_' . $ip_hash, $option);
 
     // Обновляем счётчики
     $votes = get_post_meta($poll_id, '_gpp_poll_votes', true);
