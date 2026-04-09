@@ -71,6 +71,8 @@ $ep_cover = gpp_episode_cover(get_the_ID());
     </div>
     <?php endif; ?>
 
+    <?php do_action('gpp_after_player', get_the_ID()); ?>
+
     <?php // Mobile: cover before player (hidden on desktop) ?>
     <?php $mob_cover = gpp_episode_cover(get_the_ID(), 'medium'); if ($mob_cover): ?>
       <div class="gpp-mobile-cover"><img src="<?php echo esc_url($mob_cover); ?>" alt=""></div>
