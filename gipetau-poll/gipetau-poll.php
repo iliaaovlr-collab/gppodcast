@@ -580,17 +580,14 @@ function gpp_poll_render_row($poll) {
     $total     = array_sum($combined);
     $max_votes = $total > 0 ? max($combined) : 0;
 
-    echo '<div class="gpp-pr' . ($ended ? ' gpp-pr--ended' : '') . '" data-poll-id="' . $poll->ID . '">';
-
-    // Дата
-    $post_time = get_post_time('U', false, $poll->ID);
-    echo '<span class="gpp-pr-date">' . esc_html(gpp_poll_smart_date($post_time)) . '</span>';
-
-    // Вопрос
-    echo '<span class="gpp-pr-q">' . esc_html($poll->post_title) . '</span>';
-
     if ($ended) {
-        // Завершён: результаты текстом — «Да 62% / Нет 38%»
+        // Завершённый — строка: дата | вопрос | результаты
+        echo '<div class="gpp-pr gpp-pr--ended" data-poll-id="' . $poll->ID . '">';
+
+        $post_time = get_post_time('U', false, $poll->ID);
+        echo '<span class="gpp-pr-date">' . esc_html(gpp_poll_smart_date($post_time)) . '</span>';
+        echo '<span class="gpp-pr-q">' . esc_html($poll->post_title) . '</span>';
+
         $parts = [];
         foreach ($options as $i => $opt) {
             $pct       = $total > 0 ? round($combined[$i] / $total * 100) : 0;
@@ -599,31 +596,37 @@ function gpp_poll_render_row($poll) {
             $parts[] = '<span class="' . $cls . '">' . esc_html($opt) . '&nbsp;' . $pct . '%</span>';
         }
         echo '<span class="gpp-pr-results">' . implode('<span class="gpp-pr-sep">/</span>', $parts) . '</span>';
-    } elseif ($user_vote !== false) {
-        // Уже проголосовал
-        echo '<span class="gpp-pr-opts">';
-        foreach ($options as $i => $opt) {
-            $cls = 'gpp-pr-o gpp-pr-o--done';
-            if ($user_vote === $i) $cls .= ' gpp-pr-o--sel';
-            echo '<span class="' . $cls . '">' . esc_html($opt);
-            if ($user_vote === $i) echo ' ✓';
-            echo '</span>';
-        }
-        echo '</span>';
-        echo '<span class="gpp-pr-st">голос принят</span>';
-    } else {
-        // Активное голосование — кнопки-пилюли
-        echo '<span class="gpp-pr-opts">';
-        foreach ($options as $i => $opt) {
-            echo '<button class="gpp-pr-o" data-option="' . $i . '">' . esc_html($opt) . '</button>';
-        }
-        echo '</span>';
-        if ($end_date) {
-            echo '<span class="gpp-pr-st">до ' . gpp_poll_ru_date($end_date) . '</span>';
-        }
-    }
 
-    echo '</div>';
+        echo '</div>';
+    } else {
+        // Активный — блок: вопрос, варианты по центру, статус под ними
+        echo '<div class="gpp-pr-active" data-poll-id="' . $poll->ID . '">';
+        echo '<div class="gpp-pr-active-q">' . esc_html($poll->post_title) . '</div>';
+
+        echo '<div class="gpp-pr-active-opts">';
+        if ($user_vote !== false) {
+            foreach ($options as $i => $opt) {
+                $cls = 'gpp-pr-o gpp-pr-o--done';
+                if ($user_vote === $i) $cls .= ' gpp-pr-o--sel';
+                echo '<span class="' . $cls . '">' . esc_html($opt);
+                if ($user_vote === $i) echo ' ✓';
+                echo '</span>';
+            }
+        } else {
+            foreach ($options as $i => $opt) {
+                echo '<button class="gpp-pr-o" data-option="' . $i . '">' . esc_html($opt) . '</button>';
+            }
+        }
+        echo '</div>';
+
+        if ($user_vote !== false) {
+            echo '<div class="gpp-pr-active-st">ваш голос принят</div>';
+        } elseif ($end_date) {
+            echo '<div class="gpp-pr-active-st">до ' . gpp_poll_ru_date($end_date) . '</div>';
+        }
+
+        echo '</div>';
+    }
 }
 
 /* ═══════════════════════════════════════════
@@ -807,6 +810,28 @@ function gpp_poll_css() {
       white-space:nowrap;flex-shrink:0;
     }
 
+    /* Активный опрос — блок по центру */
+    .gpp-pr-active{
+      padding:20px 0;text-align:center;
+      border-bottom:1px solid var(--gp-border);
+    }
+    .gpp-polls-list .gpp-pr-active:first-child{
+      border-top:1px solid var(--gp-border);
+    }
+    .gpp-pr-active-q{
+      font-family:var(--gp-font-body);font-size:var(--gp-fs-body);
+      color:var(--gp-text);font-weight:500;margin-bottom:10px;
+    }
+    .gpp-pr-active-opts{
+      display:flex;flex-wrap:wrap;gap:8px;
+      justify-content:center;
+    }
+    .gpp-pr-active-st{
+      margin-top:8px;
+      font-family:var(--gp-font-ui);font-size:var(--gp-fs-xs);
+      color:var(--gp-textmuted);text-transform:uppercase;letter-spacing:.05em;
+    }
+
     @media(max-width:768px){
       .gpp-pr{gap:6px}
       .gpp-pr-q{width:100%;margin-right:0}
@@ -865,8 +890,8 @@ function gpp_poll_js() {
       });
     })();
 
-    // Компактный список [gpp_polls]
-    document.querySelectorAll('.gpp-pr').forEach(function(row){
+    // Компактный список [gpp_polls] — активные опросы
+    document.querySelectorAll('.gpp-pr-active').forEach(function(row){
       row.addEventListener('click', function(e){
         var btn = e.target.closest('button.gpp-pr-o');
         if (!btn) return;
@@ -892,13 +917,13 @@ function gpp_poll_js() {
                 }
                 b.replaceWith(s);
               });
-              var st = row.querySelector('.gpp-pr-st');
+              var st = row.querySelector('.gpp-pr-active-st');
               if (!st) {
-                st = document.createElement('span');
-                st.className = 'gpp-pr-st';
+                st = document.createElement('div');
+                st.className = 'gpp-pr-active-st';
                 row.appendChild(st);
               }
-              st.textContent = 'голос принят';
+              st.textContent = 'ваш голос принят';
             } else {
               alert(resp.data || 'Ошибка');
               btn.disabled = false;
