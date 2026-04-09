@@ -241,13 +241,14 @@ function gppq_verify() {
 }
 
 /* ═══════════════════════════════════════════
-   6. ФРОНТЕНД: ФОРМА НА СТРАНИЦЕ ЭПИЗОДА
+   6. ФРОНТЕНД: ШОРТКОД [gppq_form]
+   Создайте страницу в WP и вставьте [gppq_form]
    ═══════════════════════════════════════════ */
 
-add_action('gp_after_content', 'gppq_display_form');
+add_shortcode('gppq_form', 'gppq_render_form');
 
-function gppq_display_form($post_id = null) {
-    if (!is_singular('podcast_episode')) return;
+function gppq_render_form($atts = []) {
+    ob_start();
     ?>
     <div class="gppq-wrap" id="gppqWrap">
       <h3 class="gppq-title">Предложить тему или задать вопрос</h3>
@@ -313,15 +314,16 @@ function gppq_display_form($post_id = null) {
       </div>
     </div>
     <?php
+    gppq_inline_css();
+    gppq_inline_js();
+    return ob_get_clean();
 }
 
 /* ═══════════════════════════════════════════
-   7. CSS
+   7. CSS (инлайн, выводится только при шорткоде)
    ═══════════════════════════════════════════ */
 
-add_action('wp_head', 'gppq_css');
-function gppq_css() {
-    if (!is_singular('podcast_episode')) return;
+function gppq_inline_css() {
     ?>
     <style>
     /* Карточка */
@@ -458,12 +460,10 @@ function gppq_css() {
 }
 
 /* ═══════════════════════════════════════════
-   8. JS
+   8. JS (инлайн, выводится только при шорткоде)
    ═══════════════════════════════════════════ */
 
-add_action('wp_footer', 'gppq_js');
-function gppq_js() {
-    if (!is_singular('podcast_episode')) return;
+function gppq_inline_js() {
     ?>
     <script>
     (function(){

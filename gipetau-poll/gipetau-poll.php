@@ -335,7 +335,6 @@ function gpp_poll_display($post_id = null) {
     $ep_uid = get_post_meta($post_id, '_gpp_uid', true);
     if (!$ep_uid) return;
 
-    // Ищем опросы, привязанные к этому эпизоду по UID
     $polls = get_posts([
         'post_type'      => 'gpp_poll',
         'post_status'    => 'publish',
@@ -347,89 +346,7 @@ function gpp_poll_display($post_id = null) {
     if (!$polls) return;
 
     foreach ($polls as $poll) {
-        $options = get_post_meta($poll->ID, '_gpp_poll_options', true);
-        if (!is_array($options) || empty($options)) continue;
-
-        $end_date  = get_post_meta($poll->ID, '_gpp_poll_end_date', true);
-        $ended     = $end_date && strtotime($end_date . ' 23:59:59') < time();
-        $user_vote = gpp_poll_get_user_vote($poll->ID);
-
-        $votes     = get_post_meta($poll->ID, '_gpp_poll_votes', true);
-        if (!is_array($votes)) $votes = [];
-        $tg_votes  = get_post_meta($poll->ID, '_gpp_poll_tg_votes', true);
-        if (!is_array($tg_votes)) $tg_votes = [];
-
-        // Сумма сайт + ТГ
-        $combined = [];
-        foreach ($options as $i => $opt) {
-            $combined[$i] = ($votes[$i] ?? 0) + ($tg_votes[$i] ?? 0);
-        }
-        $site_total = array_sum($votes);
-        $tg_total   = array_sum($tg_votes);
-        $total      = $site_total + $tg_total;
-        $max_votes  = $total > 0 ? max($combined) : 0;
-
-        echo '<div class="gpp-poll" data-poll-id="' . $poll->ID . '">';
-
-        // Вопрос
-        echo '<h3 class="gpp-poll-q">' . esc_html($poll->post_title) . '</h3>';
-
-        // Варианты
-        echo '<div class="gpp-poll-opts">';
-        foreach ($options as $i => $opt) {
-            $count     = $combined[$i];
-            $pct       = $total > 0 ? round($count / $total * 100) : 0;
-            $is_winner = $total > 0 && $count === $max_votes;
-            $is_user   = ($user_vote !== false && $user_vote === $i);
-
-            if ($ended) {
-                $cls = 'gpp-po gpp-po--res';
-                if ($is_winner) $cls .= ' gpp-po--win';
-                if ($is_user)   $cls .= ' gpp-po--my';
-                echo '<div class="' . $cls . '" style="--pct:' . $pct . '%">';
-                echo '<span class="gpp-po-text">' . esc_html($opt) . '</span>';
-                echo '<span class="gpp-po-pct">' . $pct . '%</span>';
-                echo '</div>';
-
-            } elseif ($user_vote !== false) {
-                $cls = 'gpp-po gpp-po--done';
-                if ($is_user) $cls .= ' gpp-po--sel';
-                echo '<div class="' . $cls . '">';
-                echo '<span class="gpp-po-text">' . esc_html($opt) . '</span>';
-                if ($is_user) echo '<svg class="gpp-po-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
-                echo '</div>';
-
-            } else {
-                echo '<button class="gpp-po" data-option="' . $i . '">';
-                echo '<span class="gpp-po-text">' . esc_html($opt) . '</span>';
-                echo '</button>';
-            }
-        }
-        echo '</div>';
-
-        // Подвал
-        echo '<div class="gpp-poll-ft">';
-        if ($ended) {
-            echo '<span>Голосование завершено</span>';
-            if ($total > 0) {
-                if ($site_total > 0 && $tg_total > 0) {
-                    echo '<span class="gpp-poll-ft-sep">&middot;</span>';
-                    echo '<span>' . $site_total . '&nbsp;сайт + ' . $tg_total . '&nbsp;ТГ = ' . $total . '</span>';
-                } else {
-                    echo '<span class="gpp-poll-ft-sep">&middot;</span>';
-                    echo '<span>' . $total . ' ' . gpp_poll_word($total) . '</span>';
-                }
-            }
-        } else {
-            if ($end_date) echo '<span>до ' . gpp_poll_ru_date($end_date) . '</span>';
-            if ($user_vote !== false) {
-                echo '<span class="gpp-poll-ft-sep">&middot;</span>';
-                echo '<span>ваш голос принят</span>';
-            }
-        }
-        echo '</div>';
-
-        echo '</div>';
+        gpp_poll_render_card($poll);
     }
 }
 
@@ -449,12 +366,170 @@ function gpp_poll_ru_date($date) {
 }
 
 /* ═══════════════════════════════════════════
-   9. CSS
+   9. АКТУАЛЬНЫЙ ОПРОС НА СТРАНИЦЕ АРХИВА
    ═══════════════════════════════════════════ */
 
-add_action('wp_head', 'gpp_poll_css');
+add_action('gpp_archive_top', 'gpp_poll_archive_top');
+
+function gpp_poll_archive_top() {
+    // Ищем один активный (не завершённый) опрос, самый свежий
+    $polls = get_posts([
+        'post_type'      => 'gpp_poll',
+        'post_status'    => 'publish',
+        'posts_per_page' => 1,
+        'orderby'        => 'date',
+        'order'          => 'DESC',
+        'meta_query'     => [
+            'relation' => 'OR',
+            ['key' => '_gpp_poll_end_date', 'value' => '', 'compare' => '='],
+            ['key' => '_gpp_poll_end_date', 'compare' => 'NOT EXISTS'],
+            ['key' => '_gpp_poll_end_date', 'value' => date('Y-m-d'), 'compare' => '>=', 'type' => 'DATE'],
+        ],
+    ]);
+    if (!$polls) return;
+
+    gpp_poll_render_card($polls[0]);
+}
+
+/* ═══════════════════════════════════════════
+   10. ШОРТКОД [gpp_polls] — ВСЕ ОПРОСЫ
+   Создайте страницу в WP и вставьте [gpp_polls]
+   ═══════════════════════════════════════════ */
+
+add_shortcode('gpp_polls', 'gpp_polls_shortcode');
+
+function gpp_polls_shortcode($atts = []) {
+    $polls = get_posts([
+        'post_type'      => 'gpp_poll',
+        'post_status'    => 'publish',
+        'posts_per_page' => 50,
+        'orderby'        => 'date',
+        'order'          => 'DESC',
+    ]);
+    if (!$polls) return '<p style="text-align:center;color:var(--gp-textmuted)">Опросов пока нет.</p>';
+
+    ob_start();
+    foreach ($polls as $poll) {
+        gpp_poll_render_card($poll);
+    }
+    return ob_get_clean();
+}
+
+/* ═══════════════════════════════════════════
+   11. ОБЩИЙ РЕНДЕР КАРТОЧКИ ОПРОСА
+   ═══════════════════════════════════════════ */
+
+function gpp_poll_render_card($poll) {
+    $options = get_post_meta($poll->ID, '_gpp_poll_options', true);
+    if (!is_array($options) || empty($options)) return;
+
+    $end_date  = get_post_meta($poll->ID, '_gpp_poll_end_date', true);
+    $ended     = $end_date && strtotime($end_date . ' 23:59:59') < time();
+    $user_vote = gpp_poll_get_user_vote($poll->ID);
+
+    $votes     = get_post_meta($poll->ID, '_gpp_poll_votes', true);
+    if (!is_array($votes)) $votes = [];
+    $tg_votes  = get_post_meta($poll->ID, '_gpp_poll_tg_votes', true);
+    if (!is_array($tg_votes)) $tg_votes = [];
+
+    $combined = [];
+    foreach ($options as $i => $opt) {
+        $combined[$i] = ($votes[$i] ?? 0) + ($tg_votes[$i] ?? 0);
+    }
+    $site_total = array_sum($votes);
+    $tg_total   = array_sum($tg_votes);
+    $total      = $site_total + $tg_total;
+    $max_votes  = $total > 0 ? max($combined) : 0;
+
+    // Эпизод (для страницы всех опросов)
+    $ep_uid  = get_post_meta($poll->ID, '_gpp_poll_episode_uid', true);
+    $ep_id   = $ep_uid ? gpp_poll_find_episode_by_uid($ep_uid) : null;
+    $ep_link = $ep_id ? get_permalink($ep_id) : '';
+    $ep_name = $ep_id ? get_the_title($ep_id) : '';
+
+    echo '<div class="gpp-poll" data-poll-id="' . $poll->ID . '">';
+
+    echo '<h3 class="gpp-poll-q">' . esc_html($poll->post_title) . '</h3>';
+
+    // Ссылка на эпизод (только вне страницы эпизода)
+    if ($ep_link && !is_singular('podcast_episode')) {
+        echo '<div class="gpp-poll-ep"><a href="' . esc_url($ep_link) . '">' . esc_html($ep_name) . '</a></div>';
+    }
+
+    echo '<div class="gpp-poll-opts">';
+    foreach ($options as $i => $opt) {
+        $count     = $combined[$i];
+        $pct       = $total > 0 ? round($count / $total * 100) : 0;
+        $is_winner = $total > 0 && $count === $max_votes;
+        $is_user   = ($user_vote !== false && $user_vote === $i);
+
+        if ($ended) {
+            $cls = 'gpp-po gpp-po--res';
+            if ($is_winner) $cls .= ' gpp-po--win';
+            if ($is_user)   $cls .= ' gpp-po--my';
+            echo '<div class="' . $cls . '" style="--pct:' . $pct . '%">';
+            echo '<span class="gpp-po-text">' . esc_html($opt) . '</span>';
+            echo '<span class="gpp-po-pct">' . $pct . '%</span>';
+            echo '</div>';
+        } elseif ($user_vote !== false) {
+            $cls = 'gpp-po gpp-po--done';
+            if ($is_user) $cls .= ' gpp-po--sel';
+            echo '<div class="' . $cls . '">';
+            echo '<span class="gpp-po-text">' . esc_html($opt) . '</span>';
+            if ($is_user) echo '<svg class="gpp-po-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
+            echo '</div>';
+        } else {
+            echo '<button class="gpp-po" data-option="' . $i . '">';
+            echo '<span class="gpp-po-text">' . esc_html($opt) . '</span>';
+            echo '</button>';
+        }
+    }
+    echo '</div>';
+
+    echo '<div class="gpp-poll-ft">';
+    if ($ended) {
+        echo '<span>Голосование завершено</span>';
+        if ($total > 0) {
+            if ($site_total > 0 && $tg_total > 0) {
+                echo '<span class="gpp-poll-ft-sep">&middot;</span>';
+                echo '<span>' . $site_total . '&nbsp;сайт + ' . $tg_total . '&nbsp;ТГ = ' . $total . '</span>';
+            } else {
+                echo '<span class="gpp-poll-ft-sep">&middot;</span>';
+                echo '<span>' . $total . ' ' . gpp_poll_word($total) . '</span>';
+            }
+        }
+    } else {
+        if ($end_date) echo '<span>до ' . gpp_poll_ru_date($end_date) . '</span>';
+        if ($user_vote !== false) {
+            echo '<span class="gpp-poll-ft-sep">&middot;</span>';
+            echo '<span>ваш голос принят</span>';
+        }
+    }
+    echo '</div>';
+
+    echo '</div>';
+}
+
+/* ═══════════════════════════════════════════
+   12. CSS — флаг для вывода
+   ═══════════════════════════════════════════ */
+
+// CSS/JS нужен на: эпизодах, архиве, и страницах с шорткодом
+add_action('wp_head',   'gpp_poll_css');
+add_action('wp_footer', 'gpp_poll_js');
+
+function gpp_poll_need_assets() {
+    if (is_singular('podcast_episode')) return true;
+    if (is_post_type_archive('podcast_episode')) return true;
+    if (is_tax('podcast_season')) return true;
+    // Шорткод на любой странице
+    global $post;
+    if ($post && has_shortcode($post->post_content, 'gpp_polls')) return true;
+    return false;
+}
+
 function gpp_poll_css() {
-    if (!is_singular('podcast_episode')) return;
+    if (!gpp_poll_need_assets()) return;
     ?>
     <style>
     /* Карточка */
@@ -471,6 +546,15 @@ function gpp_poll_css() {
       font-size:var(--gp-fs-h3);font-style:var(--gp-h-style);font-weight:var(--gp-h-weight);
       color:var(--gp-text);margin:0 0 20px;line-height:var(--gp-lh-heading);
     }
+
+    /* Ссылка на эпизод */
+    .gpp-poll-ep{
+      margin:-12px 0 16px;
+      font-family:var(--gp-font-ui);font-size:var(--gp-fs-xs);
+      color:var(--gp-textmuted);text-transform:uppercase;letter-spacing:.05em;
+    }
+    .gpp-poll-ep a{color:var(--gp-accent);text-decoration:none}
+    .gpp-poll-ep a:hover{text-decoration:underline}
 
     /* Контейнер вариантов */
     .gpp-poll-opts{
@@ -551,12 +635,11 @@ function gpp_poll_css() {
 }
 
 /* ═══════════════════════════════════════════
-   10. JS (ГОЛОСОВАНИЕ)
+   13. JS (ГОЛОСОВАНИЕ)
    ═══════════════════════════════════════════ */
 
-add_action('wp_footer', 'gpp_poll_js');
 function gpp_poll_js() {
-    if (!is_singular('podcast_episode')) return;
+    if (!gpp_poll_need_assets()) return;
     ?>
     <script>
     (function(){
