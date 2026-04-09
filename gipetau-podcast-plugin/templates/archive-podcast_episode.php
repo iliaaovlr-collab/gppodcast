@@ -38,6 +38,8 @@ $seasons = get_terms(['taxonomy'=>'podcast_season','hide_empty'=>true,'orderby'=
   <?php endif; ?>
 </div>
 
+<?php do_action('gpp_archive_top'); ?>
+
 <!-- 2. Prominent controls -->
 <div class="gpp-list-controls">
   <button class="gpp-lc-main" id="gppPlayAll" title="Воспроизвести">
